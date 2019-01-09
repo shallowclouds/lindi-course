@@ -185,7 +185,9 @@ def get_single_blog_web(mid):
     url = "https://m.weibo.cn/status/" + mid
     try:
         bsoj = requests.get(url,utils.headers).content.decode('utf-8','ignore')
-        bsoj = BeautifulSoup(bsoj)
+        ######
+        bsoj = BeautifulSoup(bsoj,'lxml')
+        # add param lxml
         return str(bsoj.body.script)
     except:
         print("Get " + url + "failed")
@@ -298,7 +300,9 @@ def get_single_blog_web(mid):
     url = "https://m.weibo.cn/status/" + mid
     try:
         bsoj = requests.get(url,utils.headers).content.decode('utf-8','ignore')
-        bsoj = BeautifulSoup(bsoj)
+        ######
+        bsoj = BeautifulSoup(bsoj,'lxml')
+        # add param lxml
         return str(bsoj.body.script)
     except:
         print("Get " + url + "failed")
