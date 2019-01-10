@@ -19,7 +19,7 @@ def init_logging():
         "%Y%m%d%H%M%S",
         time.localtime()
     ) + ".log"
-    level = "DEBUG"
+    level = "INFO"
     formatter = "[%(asctime)s] [%(threadName)s] [%(levelname)s] %(message)s"
     fh = logging.FileHandler(log_file, encoding="utf-8")
 
@@ -44,7 +44,7 @@ def main():
     load_config()
     init_logging()
     # cookie = config.get("login", "cookie")
-    cookie = "_T_WM=10483ee0dc45c38eed523efea888bcae; " \
+    cookie = r"_T_WM=10483ee0dc45c38eed523efea888bcae; " \
              "ALF=1512609560; " \
              "SCF=AquP96Utlp8YRk0uJg95bFJR8SJ9aD6FoZYo5G3aWBtE--R6WSHb4gr2i7C_3WXhuzZzQiEznJmboPTZHYfsVGo.; " \
              "SUB=_2A253BXxoDeRhGeRO4lEV9ivFzTuIHXVUBgQgrDV6PUJbktBeLWzAkW1Pc5hhPY3IL00riTnWkTkHXxfMew..; " \
@@ -58,10 +58,8 @@ def main():
     user_agent = config.get("login", "user_agent")
     weibo = WeiboSpider(cookie, user_agent, max_page)
     keywords = utils.get_keywords(config.get("spider", "keywords_list"))
-    print(keywords)
     for keyword in keywords:
         weibo.catch_keyword(keyword)
-        weibo.save()
 
 
 if __name__ == "__main__":

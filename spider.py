@@ -2,6 +2,8 @@ import requests
 import logging
 import json
 import time
+import utils
+import re
 
 
 class Spider(object):
@@ -31,6 +33,9 @@ class WeiboSpider(Spider):
     headers = dict()
     results = list()
     timeout = 500
+    keyword = ""
+    users = list()
+    users_results = list()
 
     def __init__(self, cookie, user_agent, max_page):
         super().__init__()
@@ -46,12 +51,26 @@ class WeiboSpider(Spider):
         :return: list, the results
         """
         logging.info("Start to catch keyword [%s]" % keyword)
+        self.keyword = keyword
         self.results = list()
+        self.users = list()
+        # get results of the keywords
         for page in range(0, self.max_page):
-            self.results.append(self.catch_page(keyword, page))
+            temp_result = self.catch_page(keyword, page)
+            self.results.extend(temp_result)
+            self.users.extend([item['uid'] for item in temp_result])
             logging.info("caught page %s" % page)
             time.sleep(2)
-        self.save()
+        # get rid of same users, this method is not good
+        # TODO: use a more efficient method
+        self.users = list(set(self.users))
+        # get results of users in the search results
+        self.users_results = list()
+        for user in self.users:
+            self.users_results.append(self.catch_user(user))
+            time.sleep(1)
+
+        self.save(self.results, self.users_results)
         return self.results
 
     def catch_page(self, keyword, page):
@@ -67,6 +86,7 @@ class WeiboSpider(Spider):
                                    headers=self.headers, timeout=self.timeout).content.decode("utf-8", "ignore")
         except Exception as e:
             logging.error("error occurred while catch page %s of keyword %s" % (page, keyword))
+            return list()
         return self.parse_page_results(json.loads(content))
 
     def parse_page_results(self, data):
@@ -89,7 +109,6 @@ class WeiboSpider(Spider):
             for item in sub_group:
                 if "mblog" not in item.keys():
                     continue
-                item_data = dict()
                 temp_data = item["mblog"]
                 # TODO: add time limited
 
@@ -107,9 +126,70 @@ class WeiboSpider(Spider):
         logging.debug(posts)
         return posts
 
-    def save(self):
+    def catch_user(self, uid):
+        """
+        get information of the user identified by uid
+        :param uid: string, user's uid
+        :return: dict, data of the user
+        """
+        logging.info("start to catch user [%s]'s info" % uid)
+        user_url = "https://m.weibo.cn/u/" + str(uid)
+        user_data = dict()
+
+        user_data["uid"] = uid
+        user_data["url"] = user_url
+
+        # get follow count and followers count
+        follow_data_url = "https://m.weibo.cn/api/container/getIndex" \
+                          "?type=uid&value={uid}&containerid=100505{uid}".format(uid=uid)
+        follow_content = requests.get(url=follow_data_url,
+                                      headers=self.headers,
+                                      timeout=self.timeout).content.decode("utf-8", "ignore")
+        print(follow_content)
+        follow_keyword_list = ["follow_count", "followers_count"]
+        for item in follow_keyword_list:
+            temp_re = re.compile('"{key}":([0-9]+),'.format(key=item))
+            result = re.findall(temp_re, follow_content)
+            if len(result) > 0:
+                user_data[item] = result[0]
+
+        # get user's detail information
+        detail_url = "https://m.weibo.cn/api/container/getIndex?containerid=230283{uid}_-_INFO&" \
+                     "lfid=230283{uid}&display=0&retcode=6102&#39".format(uid=uid)
+
+        detail_content = requests.get(url=detail_url,
+                                      headers=self.headers,
+                                      timeout=self.timeout).content.decode("utf-8", "ignore")
+        detail_json = json.loads(detail_content)
+        detail_headers = ['昵称', '注册时间', '简介', '性别', '年龄', '所在地', '微信号', 'is_V', 'v_简介', '标签', '教育经历']
+        detail_card = detail_json["data"]["cards"]
+        user_data["is_V"] = '0'
+        for item in detail_card:
+            if 'card_group' in item.keys():
+                sub_description = item["card_group"]
+                for item_ in sub_description:
+
+                    # 大V标志的格式在json文件中与其他不同
+                    if "item_type" in item_.keys() and item_["item_type"] == "verify_yellow":
+                        user_data["is_V"] = '1'
+                        user_data["v_简介"] = item_["item_content"]
+                    if "item_name" in item_.keys():
+                        for info in detail_headers:
+                            if item_["item_name"] == info:
+                                user_data[info] = item_["item_content"]
+
+        return user_data
+
+    def save(self, search_results, user_results):
         """
         save data to file
         :return: True if success or False
         """
-        pass
+        search_results_headers = ["bid", "comments_count", "created_at", "reposts_count", "text", "uid", "url",
+                                  "user_followers_count"]
+        utils.save_to_csv("data/"+self.keyword+"_posts.csv", search_results_headers, search_results)
+
+        user_results_headers = ["follow_count", "followers_count", "is_V", "uid", "url", "v_简介", "年龄", "微信号",
+                                "性别", "所在地", "教育经历", "昵称", "标签", "注册时间", "简介", "blog_dir", "follower_dir"]
+        utils.save_to_csv("data/"+self.keyword+"_users.csv", user_results_headers, user_results)
+        return True
