@@ -3,6 +3,6 @@ cookie = "_T_WM=10483ee0dc45c38eed523efea888bcae; ALF=1512609560; SCF=AquP96Utlp
 user_agent = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/60.0.3112.113 Safari/537.36"
 
 [spider]
-max_pages = 5
-keywords_list = "keywords.txt"
+max_page = 5
+keywords_list = keywords.txt
 limited_time = ""
